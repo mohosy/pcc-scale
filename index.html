@@ -1,0 +1,1525 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <title>PCC Student App — Scale, Reliability & Data Management Plan</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="color-scheme" content="light dark"/>
+  <meta name="description" content="Evidence-backed plan for PCC Student App: architecture, SLOs, costs, privacy, and operations (AWS primary, Azure parity)."/>
+
+  <style>
+    /* ====================== THEME & TOKENS (Cardinal & Gold) ====================== */
+    :root{
+      --cardinal:#990000; --gold:#FFC72C; --ink:#0f172a; --ink-inv:#f7fbff;
+      --bg:#0b0c10; --panel:#111319; --panel-2:#161a21; --muted:#aeb6c3; --border:#232736;
+      --accent:#F05A28; --good:#22c55e; --warn:#f59e0b; --bad:#ef4444;
+      --code:#0d1117; --mark:#fff59d; --radius:16px; --shadow: 0 18px 60px rgba(0,0,0,.35);
+      --easing: cubic-bezier(.2,.8,.2,1); --sans: ui-sans-serif, system-ui, -apple-system, Segoe UI, Inter, Roboto, "Helvetica Neue", Arial, "Noto Sans";
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Roboto Mono", "Fira Code", monospace;
+      --ring: 0 0 0 3px color-mix(in oklab, var(--gold) 35%, transparent);
+
+      /* Layout/typography scale variables driven by density (spacious/compact) */
+      --fs-body: 17.5px;
+      --lh-body: 1.75;
+      --gap: 24px;
+      --pad-section: 28px;
+      --pad-card: 18px;
+      --radius-section: 18px;
+      --radius-card: 16px;
+      --fs-h1: 36px;
+      --fs-h2: 26px;
+      --fs-h3: 22px;
+      --fs-p: 18px;
+      --fs-lead: 19px;
+      --fs-table: 16px;
+    }
+    @media (prefers-color-scheme: light){
+      :root{ --bg:#FBFAF7; --panel:#ffffff; --panel-2:#fff7e6; --ink:#141414; --ink-inv:#0f172a; --muted:#5c6675; --border:#e9e4d9; --code:#f5efe2; }
+    }
+    :root[data-theme="light"]{ color-scheme: light; --bg:#FBFAF7; --panel:#ffffff; --panel-2:#fff7e6; --ink:#141414; --ink-inv:#0f172a; --muted:#5c6675; --border:#e9e4d9; --code:#f5efe2; }
+    :root[data-theme="dark"]{ color-scheme: dark; }
+
+    /* Density (spacious default) */
+    :root[data-density="compact"]{
+      --fs-body: 16px;
+      --lh-body: 1.6;
+      --gap: 16px;
+      --pad-section: 22px;
+      --pad-card: 14px;
+      --radius-section: 16px;
+      --radius-card: 14px;
+      --fs-h1: 32px;
+      --fs-h2: 24px;
+      --fs-h3: 20px;
+      --fs-p: 16.5px;
+      --fs-lead: 17px;
+      --fs-table: 15px;
+    }
+
+    /* Newbie mode visibility: ON by default via data-newbie="on" */
+    :root[data-newbie="off"] .eli5 { display: none !important; }
+
+    /* ====================== BASE / TYPO ====================== */
+    *{ box-sizing:border-box }
+    html,body{ height:100% }
+    body{
+      margin:0; font-family:var(--sans);
+      background:
+        radial-gradient(1400px 600px at -10% -10%, color-mix(in oklab, var(--gold) 14%, transparent), transparent 60%),
+        radial-gradient(1000px 500px at 110% 0%, color-mix(in oklab, var(--cardinal) 18%, transparent), transparent 58%),
+        linear-gradient(180deg, var(--bg), var(--bg));
+      color:var(--ink-inv); -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility;
+      font-size:var(--fs-body); line-height:var(--lh-body);
+    }
+    a{ color:var(--gold) } a:hover{ opacity:.92 }
+    .wrap{ max-width:1220px; margin-inline:auto; padding:18px }
+    .grid{ display:grid; gap:var(--gap) }
+    .two{ grid-template-columns: 340px 1fr } @media (max-width: 980px){ .two{ grid-template-columns: 1fr } }
+    h1{ font-size:var(--fs-h1); margin:8px 0 6px } h2{ font-size:var(--fs-h2); margin:10px 0 6px } h3{ font-size:var(--fs-h3); margin:10px 0 4px } p,li{ font-size:var(--fs-p) } .lead{ font-size:var(--fs-lead) }
+
+    /* ====================== APP BAR ====================== */
+    header.appbar{
+      position:sticky; top:0; z-index:100; border-bottom:1px solid var(--border);
+      backdrop-filter: blur(10px);
+      background: color-mix(in oklab, var(--bg) 86%, transparent);
+    }
+    .bar{ display:flex; align-items:center; justify-content:space-between; gap:12px; padding:14px 18px }
+    .brand{ display:flex; align-items:center; gap:12px }
+    .logo{ width:30px; height:30px; border-radius:10px; background: conic-gradient(from 235deg,var(--gold),var(--cardinal),var(--gold)); box-shadow:0 0 0 2px color-mix(in oklab, var(--panel) 70%, transparent), 0 10px 28px rgba(0,0,0,.28); }
+    .quick{ display:flex; flex-wrap:wrap; gap:10px; align-items:center }
+    .btn{
+      --bgc:var(--panel); position:relative; overflow:hidden; display:inline-flex; align-items:center; gap:10px; padding:10px 14px; border:1px solid var(--border);
+      border-radius:12px; background:var(--bgc); color:var(--ink-inv); cursor:pointer; transition:.25s var(--easing); font-size:15px;
+    }
+    .btn:hover{ transform: translateY(-1px); box-shadow:var(--shadow) }
+    .btn.primary{ --bgc:linear-gradient(180deg, color-mix(in oklab, var(--gold) 84%, transparent), color-mix(in oklab, var(--cardinal) 70%, transparent)); color:#120a00; border-color:transparent; font-weight:800 }
+    .btn.ghost{ background:transparent } .btn.small{ padding:7px 11px; font-size:14px } .btn:focus-visible{ outline:none; box-shadow: var(--shadow), var(--ring) }
+
+    /* make TOUR button bigger + pulsing */
+    #tourBtn{
+      font-size:17.5px; padding:12px 18px; font-weight:900; border:2px solid transparent;
+      background:linear-gradient(180deg, color-mix(in oklab, var(--gold) 84%, transparent), color-mix(in oklab, var(--cardinal) 70%, transparent)); color:#120a00;
+      position:relative;
+    }
+    #tourBtn::after{
+      content:""; position:absolute; inset:-6px; border-radius:14px;
+      box-shadow:0 0 0 0 rgba(255,199,44,.55); animation:pulseTour 2.2s ease-out infinite;
+    }
+    @keyframes pulseTour{ to{ box-shadow:0 0 0 24px rgba(255,199,44,0) } }
+
+    .search{ display:flex; align-items:center; gap:8px; padding:10px 12px; border:1px solid var(--border); border-radius:12px; background:var(--panel); min-width:280px; }
+    .search input{ border:0; outline:0; background:transparent; width:200px; color:var(--ink-inv); font-size:15px }
+    .kbd{ font-family:var(--mono); font-size:12px; background:var(--panel-2); border:1px solid var(--border); border-radius:8px; padding:2px 8px; color:var(--muted) }
+    .progress{ height:3px; background: color-mix(in oklab, var(--panel) 72%, transparent) } .progress .bar{ height:3px; width:0%; background:linear-gradient(90deg,var(--gold),var(--cardinal),var(--accent)) }
+
+    /* ====================== LAYOUT / CARDS ====================== */
+    aside{
+      position:sticky; top:90px; height: calc(100dvh - 106px);
+      border:1px solid var(--border); border-radius:var(--radius-section); background:var(--panel); overflow:auto; box-shadow: var(--shadow);
+    }
+    nav.toc{ padding:12px }
+    nav.toc h3{ margin:8px 8px 10px; color:var(--muted); font-size:12px; text-transform:uppercase; letter-spacing:.14em }
+    nav.toc a{ display:block; padding:10px 12px; border-radius:10px; color:var(--ink-inv); border:1px solid transparent; font-size:16px; }
+    nav.toc a:hover{ background: color-mix(in oklab, var(--gold) 16%, transparent) }
+    nav.toc a.active{ background: color-mix(in oklab, var(--gold) 22%, transparent); border-color: color-mix(in oklab, var(--gold) 40%, var(--border)) }
+    nav .lvl3{ margin-left: 18px; font-size:15px }
+
+    section{
+      background:var(--panel); border:1px solid var(--border); border-radius:var(--radius-section); padding:var(--pad-section); margin-bottom:var(--gap); box-shadow:var(--shadow);
+      transition: transform .25s var(--easing), box-shadow .25s var(--easing);
+    }
+    section:hover{ transform: translateY(-2px) }
+    .card{ border:1px solid var(--border); border-radius:var(--radius-card); background: color-mix(in oklab, var(--panel) 96%, transparent); padding:var(--pad-card); box-shadow: var(--shadow) }
+    .callout{ border-left:5px solid var(--gold); background: color-mix(in oklab, var(--gold) 10%, transparent); padding:10px 14px; border-radius:12px }
+    .chip{ display:inline-flex; align-items:center; gap:6px; border:1px solid var(--border); border-radius:999px; padding:6px 10px; font-size:13px; background: color-mix(in oklab, var(--panel) 90%, transparent) }
+    .badges{ display:flex; flex-wrap:wrap; gap:10px; margin-top:6px } .row{ display:flex; align-items:center; gap:12px; flex-wrap:wrap } .right{ margin-left:auto } .muted{ color:var(--muted) }
+    .hidden{ display:none !important }
+
+    /* tables */
+    .table-wrap{ overflow:auto; border:1px solid var(--border); border-radius:16px }
+    table{ width:100%; border-collapse:collapse; min-width:820px }
+    th,td{ padding:13px 14px; border-bottom:1px solid var(--border); text-align:left; font-size:var(--fs-table) }
+    thead th{ position:sticky; top:0; background:var(--panel); z-index:1; color:var(--muted); font-size:15px }
+    tbody tr:nth-child(odd){ background: color-mix(in oklab, var(--panel) 94%, transparent) }
+
+    /* code */
+    pre,code,kbd,samp{ font-family:var(--mono) }
+    pre{ background:var(--code); padding:14px; border-radius:14px; overflow:auto; border:1px solid var(--border); font-size:14px }
+
+    /* switches */
+    .switch { display:inline-flex; align-items:center; gap:10px; user-select:none }
+    .switch input[type="checkbox"]{ appearance:none; width:48px; height:28px; background:var(--panel-2); border:1px solid var(--border); border-radius:999px; position:relative; cursor:pointer; transition:.25s }
+    .switch input[type="checkbox"]::after{ content:""; width:22px; height:22px; position:absolute; top:2.5px; left:3px; border-radius:50%; background:#fff; transition:.25s var(--easing); box-shadow:0 2px 6px rgba(0,0,0,.25) }
+    .switch input[type="checkbox"]:checked{ background:linear-gradient(90deg,var(--gold),var(--cardinal)) }
+    .switch input[type="checkbox"]:checked::after{ left:23px }
+
+    /* slo rings */
+    .rings{ display:grid; grid-template-columns: repeat(auto-fit,minmax(240px,1fr)); gap:14px }
+    .ring{ display:flex; gap:14px; align-items:center; padding:12px; border:1px solid var(--border); border-radius:14px; background: color-mix(in oklab, var(--panel) 95%, transparent) }
+    .ring .dial{
+      --pct: 0; --clr: var(--gold);
+      width:56px; height:56px; border-radius:50%;
+      background:
+        conic-gradient(var(--clr) calc(var(--pct) * 1%), rgba(255,255,255,.10) 0),
+        radial-gradient(closest-side, var(--panel) 68%, transparent 70%),
+        radial-gradient(closest-side, rgba(0,0,0,.28), transparent 72%);
+      box-shadow: inset 0 0 0 1px var(--border);
+      transition: background 1.4s var(--easing);
+    }
+    .ring .k{ font-weight:800; font-size:18px }
+
+    /* hero */
+    .hero{ background:
+      radial-gradient(1400px 520px at -10% -10%, color-mix(in oklab, var(--gold) 22%, transparent), transparent 60%),
+      radial-gradient(1200px 520px at 110% -10%, color-mix(in oklab, var(--cardinal) 24%, transparent), transparent 60%),
+      linear-gradient(180deg, color-mix(in oklab, var(--panel) 90%, transparent), transparent);
+      border:1px solid var(--border); border-radius:18px; padding:var(--pad-section); box-shadow:var(--shadow)
+    }
+
+    /* interactive architecture */
+    .arch-wrap{ display:grid; grid-template-columns: 1fr 360px; gap:14px } @media (max-width: 980px){ .arch-wrap{ grid-template-columns: 1fr } }
+    .arch-details{ border:1px solid var(--border); border-radius:16px; background: color-mix(in oklab, var(--panel) 96%, transparent); padding:14px; box-shadow:var(--shadow) }
+    .legend{ display:flex; gap:10px; flex-wrap:wrap }
+
+    /* glossary */
+    dl.glossary{ display:grid; grid-template-columns: 200px 1fr; gap:10px 18px } @media (max-width: 760px){ dl.glossary{ grid-template-columns: 1fr } }
+
+    /* reveal on scroll */
+    .reveal{ opacity:0; transform: translateY(16px) scale(.98); transition: opacity .7s var(--easing), transform .7s var(--easing) }
+    .reveal.show{ opacity:1; transform:none }
+
+    /* diagram styling inside SVG */
+    svg#diagram .node{ fill:#151a23; stroke:#2b3548; stroke-width:1.4; rx:12; filter:url(#shadow); cursor:pointer; transition: transform .25s var(--easing) }
+    svg#diagram .node:hover{ transform: translateY(-2px) }
+    svg#diagram .label{ fill:#f3f8ff; font: 700 12.5px ui-sans-serif, system-ui }
+    svg#diagram .small{ font: 500 11.5px ui-sans-serif, system-ui; fill:#bdc7d6 }
+    svg#diagram .edge{ stroke:#42526b; stroke-width:1.4; marker-end:url(#arrow); stroke-dasharray: 6 6; animation: dash 6s linear infinite }
+    @keyframes dash{ to{ stroke-dashoffset: -360 } }
+    .up{ stroke:#22d3ee !important } .warn{ stroke: var(--warn) !important } .down{ stroke: var(--bad) !important }
+    .node.up{ stroke:#22d3ee !important } .node.warn{ stroke:var(--warn) !important } .node.down{ stroke:var(--bad) !important }
+    @keyframes shake{ 10%,90%{transform:translateX(-1px)} 20%,80%{transform:translateX(2px)} 30%,50%,70%{transform:translateX(-4px)} 40%,60%{transform:translateX(4px)} }
+    .shake{ animation: shake .6s }
+
+    /* toast */
+    .toast{ position:fixed; bottom:88px; right:22px; background:var(--panel); border:1px solid var(--border); padding:12px 16px; border-radius:12px; box-shadow:var(--shadow); z-index:2000; font-size:15px }
+
+    /* modal (quiz) */
+    .overlay{ position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:2200; display:grid; place-items:center; padding:20px }
+    .modal{ background:var(--panel); border:1px solid var(--border); border-radius:18px; width:min(92vw,640px); box-shadow:var(--shadow); padding:20px }
+    .modal h3{ margin-top:0 }
+
+    /* TOUR spotlight */
+    .tour-mask{ position:fixed; inset:0; background:rgba(0,0,0,.55); z-index:2500; opacity:0; transition: opacity .25s var(--easing) }
+    .tour-mask.show{ opacity:1 }
+    .tour-ring{ position:fixed; z-index:2510; border:2px solid var(--gold); border-radius:16px; box-shadow: 0 10px 40px rgba(0,0,0,.45), 0 0 0 9999px rgba(0,0,0,.55); transition: all .35s var(--easing); pointer-events:none }
+    .tour-pop{ position:fixed; z-index:2520; background:var(--panel); border:1px solid var(--border); border-radius:14px; padding:14px; box-shadow:var(--shadow); max-width:min(90vw,520px); }
+    .tour-pop .row{ justify-content: space-between }
+    .tour-pop .dots{ display:flex; gap:6px; align-items:center; flex-wrap:wrap; max-width:240px }
+    .tour-pop .dots button{ width:10px; height:10px; border-radius:50%; border:0; background:#697789; padding:0; cursor:pointer }
+    .tour-pop .dots button.active{ background:var(--gold) }
+    .tour-pop .arrow{ position:absolute; width:14px; height:14px; background:var(--panel); border-left:1px solid var(--border); border-top:1px solid var(--border); transform: rotate(45deg); }
+    .tour-pop .progressline{ height:4px; background: color-mix(in oklab, var(--panel-2) 70%, transparent); border-radius:999px; overflow:hidden; margin-top:6px }
+    .tour-pop .progressline > i{ display:block; height:100%; width:0%; background:linear-gradient(90deg,var(--gold),var(--cardinal)); }
+
+    .sr-only{ position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); border:0 }
+    
+    /* FAB Tour button */
+    .fab-tour{
+      position:fixed; right:22px; bottom:22px; z-index:2100; border:2px solid transparent;
+      padding:14px 18px; font-weight:900; border-radius:999px; cursor:pointer;
+      background:linear-gradient(180deg, color-mix(in oklab, var(--gold) 84%, transparent), color-mix(in oklab, var(--cardinal) 70%, transparent)); color:#120a00;
+      box-shadow:0 12px 30px rgba(0,0,0,.25);
+    }
+    .fab-tour::after{
+      content:""; position:absolute; inset:-8px; border-radius:999px; box-shadow:0 0 0 0 rgba(255,199,44,.5); animation:pulseTour 2.2s ease-out infinite;
+    }
+    @media (max-width: 720px){
+      .fab-tour{ right:16px; bottom:16px; padding:12px 16px; font-size:15px }
+    }
+
+    /* print */
+    @media print{
+      header.appbar, .no-print, .toast, #bgCanvas, .tour-mask, .tour-ring, .tour-pop, .fab-tour { display:none !important }
+      body{ background:#fff; color:#000 } section{ box-shadow:none; border:1px solid #ddd } a{ color:#000; text-decoration:none }
+    }
+  </style>
+  <style>
+
+/* === PATCH: responsive diagram + legend stability === */
+svg#diagram{ width:100%; height:auto; aspect-ratio:940/480; display:block; }
+.arch-wrap{ row-gap:16px; column-gap:16px; }
+.legend{ margin-top:16px !important; }
+.legend .chip{ white-space:nowrap; flex:0 0 auto; }
+/* shrink SVG label fonts on narrow screens so 3 columns don't collide */
+@media (max-width: 860px){
+  svg#diagram .label{ font-size:11px !important }
+  svg#diagram .small{ font-size:10px !important }
+}
+@media (max-width: 680px){
+  svg#diagram .label{ font-size:10px !important }
+  svg#diagram .small{ font-size:9.5px !important }
+}
+/* prefer reduced motion: tone down edge dash + background orbs */
+@media (prefers-reduced-motion: reduce){
+  .orb{ animation:none !important }
+  svg#diagram .edge{ animation:none !important }
+}
+/* ensure the side details panel never sits on top of the SVG */
+.arch-wrap > .card:first-child{ position:relative; z-index:1 }
+.arch-details{ position:relative; z-index:2 }
+/* make chips visually distinct to avoid perceived overlap */
+.legend .chip{ border-width:1.5px }
+
+  
+/* ultra-narrow fallback: allow sideways scroll instead of overlapping labels */
+@media (max-width: 560px){
+  .arch-wrap .card{ overflow-x:auto }
+  .arch-wrap .card svg#diagram{ min-width:720px }
+}
+</style>
+
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+  <style>
+    /* ===== Diagram Zoom (enlarge) ===== */
+    .zoom-modal{
+      background: var(--panel);
+      border:1px solid var(--border);
+      border-radius:18px;
+      width:min(96vw, 1280px);
+      height:min(92vh, 820px);
+      box-shadow: var(--shadow);
+      padding:14px;
+      display:flex;
+      flex-direction:column;
+    }
+    .zoom-toolbar{ display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:8px }
+    .zoom-viewport{
+      position:relative; flex:1; overflow:hidden;
+      border:1px solid var(--border); border-radius:14px; background: color-mix(in oklab, var(--panel) 96%, transparent);
+    }
+    .zoom-stage{ position:absolute; left:0; top:0; transform-origin: 0 0; will-change: transform; }
+    .zoom-help{ color:var(--muted); font-size:12.5px }
+    /* Give the cloned SVG (#diagramZoom) the same styling as the inline diagram */
+    svg#diagramZoom{ width:1400px; height:auto; display:block; }
+    svg#diagramZoom .node{ fill:#151a23; stroke:#2b3548; stroke-width:1.4; rx:12; filter:url(#shadow); cursor:pointer; transition: transform .25s var(--easing) }
+    svg#diagramZoom .label{ fill:#f3f8ff; font: 700 12.5px ui-sans-serif, system-ui }
+    svg#diagramZoom .small{ font: 500 11.5px ui-sans-serif, system-ui; fill:#bdc7d6 }
+    svg#diagramZoom .edge{ stroke:#42526b; stroke-width:1.4; marker-end:url(#arrow); stroke-dasharray: 6 6; animation: dash 6s linear infinite }
+    @media (max-width: 860px){
+      svg#diagramZoom .label{ font-size:11px !important }
+      svg#diagramZoom .small{ font-size:10px !important }
+    }
+  </style>
+
+</head>
+<body>
+  <!-- animated background orbs -->
+  <canvas id="bgCanvas" aria-hidden="true" style="position:fixed; inset:0; z-index:-1; pointer-events:none;"></canvas>
+
+  <a class="sr-only" href="#main">Skip to content</a>
+  <header class="appbar">
+    <div class="bar wrap">
+      <div class="brand">
+        <div class="logo" aria-hidden="true"></div>
+        <div>
+          <div style="font-weight:800">PCC Student App</div>
+          <div class="muted" style="font-size:12.5px">scale • reliability • data • compliance</div>
+        </div>
+      </div>
+      <div class="quick">
+        <div class="search" role="search" aria-label="Search this plan">
+          <svg width="18" height="18" aria-hidden="true" viewBox="0 0 24 24"><path fill="currentColor" d="m21 21-4.2-4.2m1.7-4.8A7.7 7.7 0 1 1 10.8 4.1a7.7 7.7 0 0 1 7.7 7.8"/></svg>
+          <input id="search" type="search" placeholder="search this plan (⌘/ctrl+k)"/>
+          <span class="kbd">K</span>
+        </div>
+        <button class="btn" id="themeBtn" aria-pressed="false">🌓 theme</button>
+        <label class="switch"><input type="checkbox" id="eli5Toggle" checked/><span>ELI5</span></label>
+        <label class="switch"><input type="checkbox" id="compactToggle"/><span>compact mode</span></label>
+        <button class="btn" id="tourBtn" title="Guided walkthrough">🎯 start tour</button>
+        <button class="btn" id="exportBtn">🖨️ export</button>
+      </div>
+    </div>
+    <div class="progress"><div class="bar" id="readBar"></div></div>
+  </header>
+
+  <!-- Floating tour CTA -->
+  <button class="fab-tour" id="fabTour" aria-label="Start guided tour">⭐ start guided tour</button>
+
+  <div class="wrap grid two">
+    <!-- ====================== TOC ====================== -->
+    <aside aria-label="Table of contents" class="reveal">
+      <nav class="toc" id="toc">
+        <h3>contents</h3>
+        <!-- populated by JS -->
+        <div class="card" style="margin:12px">
+          <div class="row"><strong>vendor: </strong>
+            <select id="vendorSelect" class="btn small">
+              <option value="both">both</option>
+              <option value="aws" selected>aws (primary)</option>
+              <option value="azure">azure (parity)</option>
+            </select>
+          </div>
+          <div class="row" style="margin-top:10px">
+            <button class="btn small ghost" id="quizBtn">🤖 help me choose</button>
+          </div>
+        </div>
+      </nav>
+    </aside>
+
+    <!-- ====================== MAIN ====================== -->
+    <main id="main">
+      <!-- HERO -->
+      <section class="hero reveal" id="cover">
+        <h1>PCC Student App — Scale, Reliability &amp; Data Management Plan <span class="muted">(vendor‑specific, evidence‑backed)</span></h1>
+        <div class="grid" style="grid-template-columns: 1.1fr .9fr;">
+          <div class="card">
+            <p class="lead"><strong>tl;dr:</strong> campus‑grade app; scales to 15k–20k DAU; AWS primary, Azure parity; tight SLOs; runbooks; predictable cost bands.</p>
+            <div class="badges">
+              <span class="chip">FERPA</span><span class="chip">CPRA</span><span class="chip">WCAG 2.2 AA</span><span class="chip">Section 508</span>
+            </div>
+            <div class="callout eli5" style="margin-top:10px"><strong>plain english:</strong> a fast, safe student app that doesn’t crash when the whole campus logs in at once. we prefer amazon’s cloud, but the same design runs on microsoft’s too.</div>
+          </div>
+          <div class="card">
+            <div class="row">
+              <label class="switch"><input type="checkbox" id="simulateSSO"/><span>simulate sso outage</span></label>
+              <label class="switch"><input type="checkbox" id="simulateQueue"/><span>simulate queue backlog</span></label>
+              <label class="switch"><input type="checkbox" id="simulatePush"/><span>simulate push fail</span></label>
+
+              <div class="incident-builder" style="margin-top:1rem;display:flex;flex-wrap:wrap;gap:0.5rem">
+                <select id="incidentSelect" style="flex:1;min-width:200px;padding:0.4rem;border-radius:8px;background:var(--panel-2);color:var(--ink-inv);border:1px solid var(--border)">
+                  <option value="">pick an incident scenario…</option>
+                  <option value="sso-latency">sso latency spike</option>
+                  <option value="db-outage">primary db outage</option>
+                  <option value="packet-loss">regional packet loss</option>
+                  <option value="random">chaos monkey (random)</option>
+                </select>
+                <button id="launchIncident" class="btn" style="padding:0.4rem 0.8rem;border-radius:8px;background:var(--accent);color:#fff;border:none;">launch chaos 🚀</button>
+                <button id="resetIncident" class="btn" style="padding:0.4rem 0.8rem;border-radius:8px;background:var(--muted);color:#fff;border:none;">reset</button>
+              </div>
+              <canvas id="metricsCanvas" height="120" style="margin-top:1rem;width:100%"></canvas>
+            </div>
+            <p class="muted" style="margin-top:6px">flip these to watch components degrade gracefully (with visible effects).</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- 1 Executive Summary -->
+      <section id="exec" class="reveal">
+        <h2>1) Executive Summary (what we’re doing &amp; why)</h2>
+        <p><strong>Goal:</strong> Deliver a campus‑grade, secure mobile app that scales from a small pilot to 15k–20k DAU without crashing, while keeping student data safe and compliant (FERPA, CPRA, WCAG 2.2 AA, Section 508).</p>
+        <h3>Verified context</h3>
+        <ul>
+          <li>LMS is Canvas; students sign in with LancerPoint credentials.</li>
+          <li>SIS is Ellucian Banner exposed via LancerPoint / Self‑Service Banner (SSB).</li>
+          <li>Campus SSO uses PCC login gateway (WSO2). PCC also uses Microsoft 365 + Authenticator; Entra ID in use for some services. Our app federates to gateway via OIDC/SAML.</li>
+          <li>PCC’s Technology Master Plan identifies <strong>AWS</strong> as cloud posture; we mirror design for <strong>Azure</strong> one‑for‑one if preferred.</li>
+        </ul>
+        <p><strong>Primary recommendation:</strong> AWS‑centric (Fargate + Aurora PG + Redis + SQS/SNS + CloudFront/WAF), with Azure parity (AKS + Azure PG + Redis + Service Bus + Front Door/WAF).</p>
+
+        <div class="rings" style="margin-top:10px">
+          <div class="ring"><div class="dial" data-pct="99.9" style="--clr:var(--good)"></div><div><div class="k">99.9%</div><div class="muted">monthly availability</div></div></div>
+          <div class="ring"><div class="dial" data-pct="60" style="--clr:var(--gold)"></div><div><div class="k">p95 ≤ 400 ms</div><div class="muted">api latency (in‑region)</div></div></div>
+          <div class="ring"><div class="dial" data-pct="90" style="--clr:var(--cardinal)"></div><div><div class="k">p95 ≤ 1.2 s</div><div class="muted">media/doc start‑play</div></div></div>
+          <div class="ring"><div class="dial" data-pct="100" style="--clr:var(--good)"></div><div><div class="k">10k &lt; 30 s</div><div class="muted">push fan‑out</div></div></div>
+        </div>
+      </section>
+
+      <!-- 2 Architecture -->
+      <section id="arch" class="reveal">
+        <h2>2) Architecture Overview (scales under load; degrades gracefully)</h2>
+        <p class="lead"><strong>Principles:</strong> stateless compute, cache before DB, queue before spike, isolate integrations, tight SLOs with error‑budget governance.</p>
+
+        <div class="arch-wrap">
+          <!-- Interactive SVG -->
+          <div class="card" aria-label="Interactive architecture diagram">
+            <svg id="diagram" viewBox="0 0 940 480" preserveAspectRatio="xMidYMid meet">
+              <defs>
+                <linearGradient id="g1" x1="0" x2="1"><stop offset="0" stop-color="#FFC72C"/><stop offset="1" stop-color="#990000"/></linearGradient>
+                <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="3" stdDeviation="6" flood-opacity="0.35"/></filter>
+                <marker id="arrow" markerWidth="10" markerHeight="10" refX="7" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#42526b"/></marker>
+              </defs>
+              <rect class="node up" id="n-clients" x="40" y="30" width="220" height="78" rx="12"/><text class="label" x="58" y="62">Clients</text><text class="small" x="58" y="82">iOS / Android / Admin Console</text>
+              <rect class="node up" id="n-edge" x="360" y="30" width="240" height="78"/><text class="label" x="378" y="62">Edge: WAF + CDN</text><text class="small" x="378" y="82">CloudFront/WAF or Front Door/WAF</text>
+              <line class="edge up" x1="260" y1="69" x2="360" y2="69"/>
+              <rect class="node up" id="n-lb" x="700" y="30" width="200" height="78"/><text class="label" x="718" y="62">Ingress: ALB / API GW</text><text class="small" x="718" y="82">or App GW / API Mgmt</text>
+              <line class="edge up" x1="600" y1="69" x2="700" y2="69"/>
+              <rect class="node up" id="n-api" x="360" y="140" width="240" height="78"/><text class="label" x="378" y="172">Stateless API Pods</text><text class="small" x="378" y="192">Fargate (ECS) / AKS</text>
+              <line class="edge up" x1="800" y1="110" x2="480" y2="140"/>
+              <rect class="node up" id="n-obs" x="40" y="140" width="260" height="78"/><text class="label" x="58" y="172">Observability</text><text class="small" x="58" y="192">Logs • Metrics • Traces → SIEM</text>
+              <line class="edge up" x1="300" y1="179" x2="360" y2="179"/>
+              <rect class="node up" id="n-cache" x="120" y="250" width="180" height="78"/><text class="label" x="138" y="282">Redis Cache</text><text class="small" x="138" y="302">ElastiCache / Azure Cache</text>
+              <rect class="node up" id="n-db" x="360" y="250" width="240" height="78"/><text class="label" x="378" y="282">Relational DB</text><text class="small" x="378" y="302">Aurora PG / Azure PG</text>
+              <rect class="node up" id="n-obj" x="640" y="250" width="240" height="78"/><text class="label" x="658" y="282">Object Storage</text><text class="small" x="658" y="302">S3 / Blob (private)</text>
+              <line class="edge up" x1="480" y1="218" x2="210" y2="250"/><line class="edge up" x1="480" y1="218" x2="480" y2="250"/><line class="edge up" x1="480" y1="218" x2="760" y2="250"/>
+              <rect class="node up" id="n-queue" x="120" y="360" width="180" height="78"/><text class="label" x="138" y="392">Queue / Bus</text><text class="small" x="138" y="412">SQS+SNS / Service Bus</text>
+              <rect class="node up" id="n-workers" x="360" y="360" width="240" height="78"/><text class="label" x="378" y="392">Workers & Jobs</text><text class="small" x="378" y="412">Fargate / AKS / Functions</text>
+              <rect class="node up" id="n-int" x="640" y="360" width="240" height="78"/><text class="label" x="658" y="392">Integrations</text><text class="small" x="658" y="412">SSO, Canvas, Banner</text>
+              <line class="edge up" x1="210" y1="360" x2="480" y2="360"/><line class="edge up" x1="480" y1="360" x2="760" y2="360"/>
+            </svg>
+            <div class="legend" style="margin-top:10px">
+              <span class="chip">healthy</span>
+              <span class="chip" style="border-color: color-mix(in oklab, var(--warn) 50%, var(--border))">stressed</span>
+              <span class="chip" style="border-color: color-mix(in oklab, var(--bad) 60%, var(--border))">degraded</span>
+              <span class="chip">tip: click any box to learn more</span>
+            </div>
+          </div>
+
+          <div class="arch-details" id="archDetails" aria-live="polite">
+            <h3 id="archTitle">select a component</h3>
+            <p class="muted">click a box in the diagram to see what it does and how it maps to AWS/Azure.</p>
+            <div id="archBody"></div>
+          </div>
+        </div>
+
+        <h3 style="margin-top:14px">Degradation modes</h3>
+        <ul id="degList">
+          <li><strong>SSO/Banner/Canvas slow or down</strong> → serve last‑known‑good from Redis (TTL minutes), trip circuit breakers, show in‑app status banner, throttle callers; write paths pause until health restores.</li>
+          <li><strong>Queue pile‑up</strong> → autoscale workers by queue depth, move poison messages to DLQ; backoff + jitter on retries.</li>
+          <li><strong>Push failure</strong> → DLQ + delayed redelivery; fallback to in‑app alerts/email for critical notices.</li>
+        </ul>
+        <div class="eli5 callout"><strong>eli5:</strong> if a campus system is slow, we show students cached info, stop hammering the broken thing, and retry later. no crash‑fest.</div>
+      </section>
+
+      <!-- 3 BOM -->
+      <section id="bom" class="reveal">
+        <h2>3) Bill of Materials (primary + parity)</h2>
+        <div class="row no-print" style="justify-content:space-between">
+          <div class="row">
+            <label class="switch"><input type="checkbox" id="hideAws"/> <span>hide aws</span></label>
+            <label class="switch"><input type="checkbox" id="hideAzure"/> <span>hide azure</span></label>
+          </div>
+          <div class="row">
+            <input id="bomFilter" class="btn small" placeholder="filter rows…" aria-label="Filter bill of materials"/>
+            <button class="btn small" id="bomClear">clear</button>
+          </div>
+        </div>
+        <div class="table-wrap" role="region" aria-label="Bill of Materials">
+          <table id="bomTable">
+            <thead><tr><th>Layer</th><th data-col="aws">Primary (AWS)</th><th data-col="azure">Parity (Azure)</th><th>Notes</th></tr></thead>
+            <tbody>
+              <tr><td>Edge + WAF + CDN</td><td data-col="aws">CloudFront + AWS WAF</td><td data-col="azure">Front Door + Azure WAF</td><td>TLS, DDoS, managed rules, signed URLs</td></tr>
+              <tr><td>DNS</td><td data-col="aws">Route 53</td><td data-col="azure">Azure DNS</td><td>Geo‑redundant zones</td></tr>
+              <tr><td>Ingress</td><td data-col="aws">ALB + (optional) API Gateway</td><td data-col="azure">Application Gateway + (optional) API Management</td><td>L7 routing, transforms, rate limits</td></tr>
+              <tr><td>Stateless compute</td><td data-col="aws"><strong>Fargate</strong> (ECS)</td><td data-col="azure"><strong>AKS</strong> (HPA)</td><td>No servers (Fargate) vs. k8s control with AKS</td></tr>
+              <tr><td>Workers / Jobs</td><td data-col="aws">Fargate tasks (EventBridge)</td><td data-col="azure">AKS workers / Azure Functions</td><td>Background jobs, fan‑out, ETL</td></tr>
+              <tr><td>Relational DB</td><td data-col="aws"><strong>Aurora PostgreSQL</strong> (multi‑AZ + replicas)</td><td data-col="azure"><strong>Azure DB for PostgreSQL — Flexible</strong> (HA + replicas)</td><td>PITR, replicas, pooling</td></tr>
+              <tr><td>Cache</td><td data-col="aws">ElastiCache for Redis</td><td data-col="azure">Azure Cache for Redis</td><td>Session + read‑through caching</td></tr>
+              <tr><td>Object storage</td><td data-col="aws">S3 (private, versioned)</td><td data-col="azure">Blob Storage (private, versioned)</td><td>Short‑TTL presigned URLs</td></tr>
+              <tr><td>Queue/Bus</td><td data-col="aws">SQS (+ SNS topics)</td><td data-col="azure">Service Bus</td><td>Backpressure + DLQ</td></tr>
+              <tr><td>Push</td><td data-col="aws">APNs + FCM (via SNS or direct)</td><td data-col="azure">APNs + FCM (via Notification Hubs)</td><td>High fan‑out</td></tr>
+              <tr><td>Email/SMS</td><td data-col="aws">SES / Pinpoint (SMS)</td><td data-col="azure">Azure Communication Services</td><td>Critical alerts & recovery</td></tr>
+              <tr><td>Secrets/KMS</td><td data-col="aws">Secrets Manager + KMS</td><td data-col="azure">Key Vault</td><td>Rotation, least privilege</td></tr>
+              <tr><td>Observability</td><td data-col="aws">CloudWatch + OTEL (or Datadog) + Sentry</td><td data-col="azure">Azure Monitor + App Insights + OTEL (or Datadog) + Sentry</td><td>Golden signals + tracing</td></tr>
+              <tr><td>SIEM (opt.)</td><td data-col="aws">Security Hub/GuardDuty or Splunk</td><td data-col="azure">Microsoft Sentinel</td><td>Central detections</td></tr>
+              <tr><td>CI/CD + IaC</td><td data-col="aws">GitHub Actions (OIDC) + Terraform</td><td data-col="azure">GitHub Actions/Azure DevOps + Terraform</td><td>Policy checks, SBOM scans</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="eli5 callout"><strong>eli5:</strong> this table is “aws ↔ azure equivalents.” pick your flavor; the design stays the same.</div>
+      </section>
+
+      <!-- 4 SLOs -->
+      <section id="slos" class="reveal">
+        <h2>4) Capacity Targets &amp; SLOs (with gates)</h2>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Metric</th><th style="text-align:right">Target</th><th>Gate (fail = rollback)</th></tr></thead>
+            <tbody>
+              <tr><td>Availability (core APIs)</td><td style="text-align:right">≥ <strong>99.9%</strong> monthly</td><td>SLO burn alert + auto hold on risky deploys</td></tr>
+              <tr><td>API latency (cache hit)</td><td style="text-align:right">p95 ≤ <strong>200 ms</strong></td><td>Load tests must pass</td></tr>
+              <tr><td>API latency (cache miss)</td><td style="text-align:right">p95 ≤ <strong>450 ms</strong></td><td>Load tests must pass</td></tr>
+              <tr><td>Start‑play (media/docs)</td><td style="text-align:right">p95 ≤ <strong>1.2 s</strong></td><td>Synthetic probes</td></tr>
+              <tr><td>Push fan‑out</td><td style="text-align:right"><strong>10k devices &lt; 30 s</strong></td><td>Canary push before campus blasts</td></tr>
+              <tr><td>Jobs processing</td><td style="text-align:right">95% &lt; <strong>60 s</strong></td><td>Queue‑depth SLO breach pages on‑call</td></tr>
+              <tr><td>RPO / RTO</td><td style="text-align:right">≤ <strong>15 m</strong> / ≤ <strong>60 m</strong></td><td>Quarterly DR drill evidence</td></tr>
+              <tr><td>Crash‑free sessions</td><td style="text-align:right">≥ <strong>99.5%</strong></td><td>Release gate in mobile CI/CD</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- 5 Scalability -->
+      <section id="scale" class="reveal">
+        <h2>5) Scalability Mechanics (how we stay fast)</h2>
+        <h3>5.1 DB scale plan</h3>
+        <ul>
+          <li>Read replicas; <strong>replica‑lag alert &gt; 2 s</strong>.</li>
+          <li><strong>pgbouncer</strong> connection pooling; cap max conns per pod; shed excess.</li>
+          <li><strong>Query budgets:</strong> p95 ≤ 50 ms; slow‑query log + kill switch for outliers.</li>
+          <li><strong>Partition</strong> hot tables by <code>term_id</code>; quarterly maintenance.</li>
+          <li>SIS/LMS writes &amp; syncs flow via queue; retries = exponential backoff + jitter.</li>
+        </ul>
+        <h3>5.2 Cache &amp; TTL matrix</h3>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Data</th><th style="text-align:right">TTL</th><th>Strategy</th></tr></thead>
+            <tbody>
+              <tr><td>Directory/profile tiles</td><td style="text-align:right"><strong>6–12 h</strong></td><td>Public CDN cache</td></tr>
+              <tr><td>Schedules/assignments</td><td style="text-align:right"><strong>15–60 m</strong></td><td>Redis read‑through; stale‑while‑revalidate</td></tr>
+              <tr><td>Announcements</td><td style="text-align:right"><strong>2–5 m</strong></td><td>Redis + edge cache</td></tr>
+              <tr><td>Feature flags/config</td><td style="text-align:right"><strong>30–60 s</strong></td><td>In‑proc + Redis</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <h3>5.3 Backpressure, rates &amp; breakers</h3>
+        <p>Rate limits per user/IP; circuit breakers around Canvas/Banner; timeouts (~3 s) with graceful fallbacks; soft/negative caching to avoid hammering.</p>
+        <h3>5.4 Offline tolerance</h3>
+        <p>Encrypted local store (SQLite/Realm) for schedule/map; background sync on reconnect.</p>
+      </section>
+
+      <!-- 6 Privacy -->
+      <section id="privacy" class="reveal">
+        <h2>6) Data Privacy, Security &amp; Compliance</h2>
+        <h3>6.1 Data classification &amp; minimization</h3>
+        <ul>
+          <li><strong>We do not store grades/SSNs</strong>; authoritative records remain in Banner/Canvas.</li>
+          <li>Minimal identifiers + device tokens; LMS/SIS data cached with short TTLs only.</li>
+        </ul>
+        <h3>6.2 Retention &amp; student rights</h3>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Data Type</th><th style="text-align:right">Prod Retention</th><th style="text-align:right">Backups</th><th>Notes</th></tr></thead>
+            <tbody>
+              <tr><td>Sessions (JWT/refresh)</td><td style="text-align:right">24 h or logout</td><td style="text-align:right">n/a (Redis only)</td><td>Short TTL prevents abuse</td></tr>
+              <tr><td>Cached LMS/SIS</td><td style="text-align:right">15–60 m</td><td style="text-align:right">n/a</td><td>Purged automatically</td></tr>
+              <tr><td>Audit logs (sensitive/admin)</td><td style="text-align:right">18–24 mo <strong>immutable</strong></td><td style="text-align:right">24 mo</td><td>WORM (Object Lock/Blob immutability)</td></tr>
+              <tr><td>Analytics (anonymized)</td><td style="text-align:right">12–18 mo</td><td style="text-align:right">18 mo</td><td>Opt‑out; no IP/PII</td></tr>
+              <tr><td>Push tokens</td><td style="text-align:right">Until invalid / 90 d inactive</td><td style="text-align:right">12 mo</td><td>Auto removal on invalidation</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p><strong>DSR:</strong> 10‑business‑day SLA; export/deletion via helpdesk; purge queue handles backups post‑hold.</p>
+      </section>
+
+      <!-- 7 SRE & Ops -->
+      <section id="ops" class="reveal">
+        <h2>7) Observability, SRE &amp; Operations</h2>
+        <ul>
+          <li><strong>Golden signals:</strong> latency, traffic, errors, saturation; OTEL traces across API→DB→object store.</li>
+          <li><strong>Dashboards &amp; alerts:</strong> latency percentiles, error rates, cache hit, DB CPU/IO, queue depth, push success.</li>
+          <li><strong>Error budgets:</strong> SLO burn pages on‑call; risky launches paused when budget is exhausted.</li>
+          <li><strong>Incident response:</strong> on‑call rotation; <strong>sev1 page ≤ 5 min</strong>, status page ≤ 10 min; comms templates; blameless postmortems.</li>
+          <li><strong>Backups &amp; DR:</strong> PITR on DB, versioned buckets, cross‑region replication; <strong>RPO ≤ 15 m / RTO ≤ 60 m</strong>; quarterly DR drills.</li>
+        </ul>
+      </section>
+
+      <!-- 8 Costs -->
+      <section id="cost" class="reveal">
+        <h2>8) Cost Model (pilot → campus; with observability)</h2>
+        <div class="grid" style="grid-template-columns: 1fr 1fr;">
+          <div class="card">
+            <div class="row">
+              <label for="dau"><strong>Daily Active Users:</strong></label>
+              <input id="dau" type="range" min="100" max="25000" step="100" value="20000" style="width:260px"/>
+              <span id="dauVal" class="chip">20,000</span>
+            </div>
+            <div class="row" style="margin-top:10px">
+              <label><input type="radio" name="vendorCost" value="aws" checked/> AWS</label>
+              <label><input type="radio" name="vendorCost" value="azure"/> Azure</label>
+            </div>
+            <div class="row" style="margin-top:10px">
+              <div style="font-size:30px; font-weight:900" id="costRange">$12–15k/mo</div>
+              <div class="muted">incl. observability</div>
+            </div>
+            <canvas id="costPie" width="380" height="240" style="max-width:100%; background:var(--panel); border:1px solid var(--border); border-radius:14px; margin-top:10px"></canvas>
+            <div class="muted">breakdown: compute, db, cache, storage/cdn, queues/waf, observability</div>
+          </div>
+          <div class="card">
+            <h3>Static bands (quick reference)</h3>
+            <div class="grid" style="grid-template-columns: 1fr 1fr;">
+              <div>
+                <h4>AWS (primary)</h4>
+                <ul>
+                  <li>Pilot (≈300 users): <strong>$2–3k/mo</strong></li>
+                  <li>Department (≈2k users): <strong>$6–7k/mo</strong></li>
+                  <li>Campus (15k–20k users): <strong>$12–15k/mo</strong></li>
+                </ul>
+                <p class="muted">−30–50% with savings plans/edu pricing.</p>
+              </div>
+              <div>
+                <h4>Azure (parity)</h4>
+                <ul>
+                  <li>Pilot: <strong>$2.5–3.5k/mo</strong></li>
+                  <li>Department: <strong>$7–8k/mo</strong></li>
+                  <li>Campus: <strong>$14–17k/mo</strong></li>
+                </ul>
+                <p class="muted">Reserved capacity lowers cost.</p>
+              </div>
+            </div>
+            <div class="eli5 callout"><strong>eli5:</strong> more students → more cost, but caching/CDN keep bills sane.</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 9 Implementation -->
+      <section id="plan" class="reveal">
+        <h2>9) Implementation Plan &amp; Gates</h2>
+        <div class="grid" style="grid-template-columns: 1fr 1fr 1fr;">
+          <div class="card">
+            <strong>Phase 1 — Pilot (Oct–Nov 2025; ~300 users)</strong>
+            <p>Scope: login, schedule, notifications, map.</p>
+            <p><em>Gates:</em> p95 &lt; 400 ms; error &lt; 0.5%; crash‑free ≥ 99.5%; security criticals = 0; DR tabletop done.</p>
+          </div>
+          <div class="card">
+            <strong>Phase 2 — Departmental (Dec 2025–Feb 2026; ~2k users)</strong>
+            <p>Scope: assignments feed, AI support bot, offline mode.</p>
+            <p><em>Gates:</em> push 10k &lt; 30 s; queue backlog clears &lt; 5 m; zero sev1 incidents in last 30 days.</p>
+          </div>
+          <div class="card">
+            <strong>Phase 3 — Campus‑wide (Mar–Jun 2026; 15k–20k users)</strong>
+            <p>Scope: full rollout, accessibility VPAT, quarterly chaos + DR drills; reserved capacity purchase.</p>
+            <p><em>Gates:</em> all SLOs green for 30 days; successful campus‑scale load test.</p>
+          </div>
+        </div>
+        <p><strong>Handover:</strong> IaC repo, runbooks, dashboards, training sessions; knowledge‑transfer on auth, DR, and incident playbooks.</p>
+      </section>
+
+      <!-- 10 Risks -->
+      <section id="risks" class="reveal">
+        <h2>10) Risk Register (top risks)</h2>
+        <div class="row no-print">
+          <input id="riskFilter" class="btn small" placeholder="filter risks…" aria-label="Filter risks"/>
+          <button class="btn small" id="riskClear">clear</button>
+        </div>
+        <div class="table-wrap">
+          <table id="riskTable">
+            <thead><tr><th>Risk</th><th>Likelihood</th><th>Impact</th><th>Mitigation</th></tr></thead>
+            <tbody>
+              <tr><td>SIS/LMS throttling or outage</td><td>M</td><td>H</td><td>Caching, circuit breakers, backoff + jitter; clear user banners</td></tr>
+              <tr><td>DB hot partitions / connection storms</td><td>M</td><td>H</td><td>Read replicas, pgbouncer, query budgets, partition plan</td></tr>
+              <tr><td>SSO outage</td><td>L</td><td>H</td><td>Cached sessions, read‑only mode, comms templates</td></tr>
+              <tr><td>Cost overruns</td><td>M</td><td>M</td><td>Budgets, lifecycle policies, reserved capacity</td></tr>
+              <tr><td>Accessibility regressions</td><td>M</td><td>M</td><td>CI checks + manual audits; VPAT gate</td></tr>
+              <tr><td>Vendor lock‑in</td><td>M</td><td>M</td><td>Open standards (k8s, PG, OTEL); IaC & migration runbooks</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Appendices -->
+      <section id="appendix-a" class="reveal">
+        <h2>Appendix A — Minimal SQL Schema (starter)</h2>
+        <pre id="sql">
+-- users
+CREATE TABLE users (
+  id UUID PRIMARY KEY,
+  external_id TEXT UNIQUE,          -- SIS/LMS id
+  email TEXT,                       -- directory info only
+  first_name TEXT,
+  last_name TEXT,
+  role TEXT CHECK (role IN ('student','instructor','admin')),
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- devices
+CREATE TABLE devices (
+  id UUID PRIMARY KEY,
+  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+  platform TEXT CHECK (platform IN ('ios','android','web')),
+  push_token TEXT,
+  last_seen TIMESTAMPTZ
+);
+
+-- audit_logs (immutable store recommended)
+CREATE TABLE audit_logs (
+  id UUID PRIMARY KEY,
+  user_id UUID REFERENCES users(id),
+  action TEXT,
+  resource TEXT,
+  details JSONB,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+</pre>
+      </section>
+
+      <section id="appendix-b" class="reveal">
+        <h2>Appendix B — Retention Schedule (draft)</h2>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Data Type</th><th style="text-align:right">Default Retention</th><th>Deletion Path</th></tr></thead>
+            <tbody>
+              <tr><td>Sessions</td><td style="text-align:right">24 h</td><td>TTL in Redis; revoke on logout</td></tr>
+              <tr><td>Cached LMS/SIS</td><td style="text-align:right">15–60 m</td><td>Auto purge on TTL</td></tr>
+              <tr><td>Audit logs</td><td style="text-align:right">18–24 mo (immutable)</td><td>Lifecycle to cold; delete post‑retention</td></tr>
+              <tr><td>Analytics (anon)</td><td style="text-align:right">12–18 mo</td><td>Anonymize on ingest; purge on schedule</td></tr>
+              <tr><td>Push tokens</td><td style="text-align:right">until invalid / 90 d inactive</td><td>Auto removal on invalidation</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- glossary for newcomers -->
+      <section id="glossary" class="reveal">
+        <h2>Glossary (for newcomers)</h2>
+        <dl class="glossary">
+          <dt>SLO</dt><dd>a target we promise (like “site up 99.9%”).</dd>
+          <dt>p95</dt><dd>95% of requests are faster than this number.</dd>
+          <dt>RPO / RTO</dt><dd>max data we can lose / time to recover after outage.</dd>
+          <dt>DLQ</dt><dd>dead letter queue — where failed messages go.</dd>
+          <dt>CDN</dt><dd>a global cache that makes files load faster.</dd>
+          <dt>k6/Locust</dt><dd>tools to simulate lots of users and test speed.</dd>
+        </dl>
+      </section>
+
+      <section id="refs" class="reveal">
+        <h2>References (public, non‑proprietary)</h2>
+        <ul>
+          <li>Canvas @ PCC (login guidance).</li>
+          <li>LancerPoint / Banner links (SSB; prod &amp; non‑prod menus).</li>
+          <li>PCC Login gateway (WSO2 Identity Server) — campus SSO front door.</li>
+          <li>Microsoft 365 &amp; Authenticator in use at PCC.</li>
+          <li>Technology Master Plan — PCC selected AWS as cloud partner.</li>
+        </ul>
+      </section>
+
+      <footer class="muted" style="margin:18px 0 34px">© 2025 Pasadena City College — draft for review</footer>
+    </main>
+  </div>
+
+  <!-- live region for a11y -->
+  <div id="live" class="sr-only" aria-live="polite"></div>
+
+  <!-- ====================== JS ====================== -->
+  <script>
+    /* ===== utils ===== */
+    const $ = (q, root=document)=> root.querySelector(q);
+    const $$ = (q, root=document)=> [...root.querySelectorAll(q)];
+    const toast = (msg)=>{ const t=document.createElement('div'); t.className='toast'; t.textContent=msg; document.body.appendChild(t); setTimeout(()=>t.remove(),1600); };
+    const clamp = (v,min,max)=> Math.max(min, Math.min(max,v));
+
+    // Button ripple
+    document.addEventListener('click', e=>{
+      const b = e.target.closest('.btn'); if(!b) return;
+      const r = document.createElement('span');
+      const rect = b.getBoundingClientRect(), size = Math.max(rect.width, rect.height);
+      Object.assign(r.style, { position:'absolute', width:size+'px', height:size+'px', left:(e.clientX-rect.left-size/2)+'px', top:(e.clientY-rect.top-size/2)+'px', background:'radial-gradient(circle, color-mix(in oklab, var(--gold) 70%, transparent), transparent 60%)', borderRadius:'50%', transform:'scale(0)', opacity:.75, pointerEvents:'none', transition:'transform .6s var(--easing), opacity .6s var(--easing)' });
+      b.appendChild(r); requestAnimationFrame(()=>{ r.style.transform='scale(1)'; r.style.opacity='0'; }); setTimeout(()=> r.remove(), 650);
+    });
+
+    /* ===== theme toggle ===== */
+    (function(){
+      const root = document.documentElement;
+      const btn = $('#themeBtn');
+      const stored = localStorage.getItem('theme'); if(stored) root.setAttribute('data-theme', stored);
+      btn.addEventListener('click', ()=>{
+        const next = root.getAttribute('data-theme')==='light' ? 'dark' : 'light';
+        root.setAttribute('data-theme', next); localStorage.setItem('theme', next); btn.setAttribute('aria-pressed', next==='dark');
+      });
+    })();
+
+    /* ===== density (compact/spacious) toggle — persistent ===== */
+    (function(){
+      const root = document.documentElement;
+      const chk = $('#compactToggle');
+      const stored = localStorage.getItem('density');
+      if(stored){ root.setAttribute('data-density', stored); chk.checked = stored==='compact'; }
+      else { root.setAttribute('data-density','spacious'); chk.checked = false; }
+      const apply = ()=>{
+        const d = chk.checked ? 'compact' : 'spacious';
+        root.setAttribute('data-density', d);
+        localStorage.setItem('density', d);
+        toast(d==='compact' ? 'compact mode on' : 'compact mode off');
+      };
+      chk.addEventListener('change', apply);
+    })();
+
+    /* ===== newbie (ELI5) toggle — global and persistent ===== */
+    (function(){
+      const root = document.documentElement;
+      const chk = $('#eli5Toggle');
+      const live = $('#live');
+      const stored = localStorage.getItem('newbie');
+      if(stored){ root.setAttribute('data-newbie', stored); chk.checked = stored === 'on'; }
+      else { root.setAttribute('data-newbie','on'); chk.checked = true; }
+      const apply = ()=>{
+        const state = chk.checked ? 'on' : 'off';
+        root.setAttribute('data-newbie', state);
+        localStorage.setItem('newbie', state);
+        live.textContent = `Newbie mode ${state === 'on' ? 'on' : 'off'}.`;
+        toast(`ELI5 ${state === 'on' ? 'enabled' : 'hidden'}`);
+      };
+      chk.addEventListener('change', apply);
+    })();
+
+    /* ===== progress bar ===== */
+    const readBar = $('#readBar');
+    window.addEventListener('scroll', ()=>{
+      const sc = document.documentElement.scrollTop || document.body.scrollTop;
+      const h = document.documentElement.scrollHeight - document.documentElement.clientHeight;
+      readBar.style.width = (100*sc/h) + '%';
+    }, { passive:true });
+
+    /* ===== build TOC ===== */
+    (function(){
+      const toc = $('#toc');
+      const heads = $$('#main h2, #main h3');
+      heads.forEach(h=>{
+        const id = h.id || h.textContent.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/(^-|-$)/g,'');
+        h.id = id;
+        const a = document.createElement('a'); a.href = '#'+id; a.textContent = h.textContent;
+        if(h.tagName==='H3') a.classList.add('lvl3');
+        toc.appendChild(a);
+      });
+      const links = $$('#toc a'); const map = new Map(links.map(a=>[a.getAttribute('href').slice(1),a]));
+      const obs = new IntersectionObserver(es=>{
+        es.forEach(e=>{ if(e.isIntersecting){ links.forEach(l=>l.classList.remove('active')); map.get(e.target.id)?.classList.add('active'); }});
+      }, { rootMargin: "0px 0px -70% 0px" });
+      $$('#main h2').forEach(h=>obs.observe(h));
+    })();
+
+    /* ===== reveal on scroll & SLO ring animation ===== */
+    (function(){
+      const obs = new IntersectionObserver(es=>{
+        es.forEach(e=>{ if(e.isIntersecting){ e.target.classList.add('show'); obs.unobserve(e.target); }});
+      }, { threshold:.12 });
+      $$('.reveal').forEach(el=> obs.observe(el));
+      setTimeout(()=> $$('.dial').forEach(d=>{ const pct = +d.getAttribute('data-pct') || 0; d.style.setProperty('--pct', pct); }), 400);
+    })();
+
+    /* ===== search & highlight ===== */
+    (function(){
+      const input = $('#search'); let marks=[];
+      const clear = ()=>{ marks.forEach(m=>{ const p=m.parentNode; p.replaceChild(document.createTextNode(m.textContent), m); p.normalize();}); marks=[]; };
+      const walk = (n, term)=>{
+        if(n.nodeType===3){
+          const idx = n.data.toLowerCase().indexOf(term);
+          if(idx>-1){ const r = document.createRange(); r.setStart(n,idx); r.setEnd(n, idx+term.length);
+            const mark = document.createElement('mark'); mark.style.background = 'var(--mark)'; r.surroundContents(mark); marks.push(mark); }
+        }else if(n.nodeType===1){
+          const tag = n.tagName;
+          if(['SCRIPT','STYLE','PRE','CODE','BUTTON','INPUT','SELECT','TEXTAREA','SUMMARY'].includes(tag)) return;
+          [...n.childNodes].forEach(c=>walk(c, term));
+        }
+      };
+      document.addEventListener('keydown', e=>{ if((e.metaKey||e.ctrlKey) && e.key.toLowerCase()==='k'){ e.preventDefault(); input.focus(); }});
+      input.addEventListener('input', ()=>{
+        clear(); const q = input.value.trim().toLowerCase(); if(q.length<2) return;
+        walk($('#main'), q); marks[0]?.scrollIntoView({behavior:'smooth', block:'center'});
+      });
+    })();
+
+    /* ===== incident simulation ===== */
+    (function(){
+      const sso = $('#simulateSSO'), que = $('#simulateQueue'), push = $('#simulatePush');
+      const nodes = { edge: $('#n-edge'), api: $('#n-api'), db: $('#n-db'), cache: $('#n-cache'), obj: $('#n-obj'), lb: $('#n-lb'), int: $('#n-int'), q: $('#n-queue'), w: $('#n-workers'), obs: $('#n-obs'), cli: $('#n-clients') };
+      const lines = $$('#diagram .edge');
+      function reset(){ $$('#diagram .node').forEach(n=>{ n.classList.remove('warn','down','shake'); n.classList.add('up'); }); lines.forEach(l=>{ l.classList.remove('warn','down'); l.classList.add('up'); }); }
+      function apply(){
+        reset();
+        let lat=40, err=0;
+        if(sso.checked){ lat+=120; err+=8; nodes.int.classList.remove('up'); nodes.int.classList.add('down','shake'); toast('sim: sso outage → cached read‑only');         if (typeof updateMetrics === "function") updateMetrics(lat, err);
+    }
+        if(que.checked){ nodes.q.classList.remove('up'); nodes.q.classList.add('warn','shake'); nodes.w.classList.remove('up'); nodes.w.classList.add('warn'); toast('sim: queue backlog → autoscale + dlq'); }
+        if(push.checked){ nodes.cli.classList.remove('up'); nodes.cli.classList.add('warn'); toast('sim: push provider partial fail → retry + fallback'); }
+      }
+      [sso,que,push].forEach(x=> x.addEventListener('change', apply));
+    })();
+    /* ===== enhanced incident scenarios ===== */
+    (function(){
+      const incidentSelect = $('#incidentSelect');
+      const launchBtn = $('#launchIncident');
+      const resetBtn = $('#resetIncident');
+      const ctx = document.getElementById('metricsCanvas');
+      if(!incidentSelect || !launchBtn || !resetBtn || !ctx) return;
+
+      
+      // ensure Chart.js UMD is available (avoid runtime errors if CDN fails)
+      if (typeof Chart === 'undefined') {
+        console.warn('Chart.js not available; disabling incident metrics chart');
+        return;
+      }
+
+// chart.js setup
+      const metricsChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: Array.from({length:60},(_,i)=>i+'s'),
+          datasets: [
+            { label:'latency (ms)', data: Array(60).fill(40), borderWidth:2, tension:0.3 },
+            { label:'error %', data: Array(60).fill(0), borderWidth:2, tension:0.3, yAxisID:'y1' }
+          ]
+        },
+        options:{
+          responsive:true,
+          animation:false,
+          interaction:{intersect:false,mode:'index'},
+          scales:{
+            y:{ beginAtZero:true, title:{display:true,text:'latency'}},
+            y1:{ beginAtZero:true, position:'right', grid:{drawOnChartArea:false}, title:{display:true,text:'error %'} }
+          },
+          plugins:{ legend:{display:true} }
+        }
+      });
+
+// baseline jitter to avoid flatlines
+let baselineLatency = 40;
+let baselineError = 0;
+const jitterTimer = setInterval(() => {
+  baselineLatency += (Math.random() - 0.5) * 4;
+  baselineLatency = Math.max(30, Math.min(60, baselineLatency));
+  metricsChart.data.datasets[0].data.push(Math.round(baselineLatency));
+  metricsChart.data.datasets[0].data.shift();
+  metricsChart.data.datasets[1].data.push(baselineError);
+  metricsChart.data.datasets[1].data.shift();
+  metricsChart.update('none');
+}, 1000);
+
+      // node map
+      const nodes = { edge: $('#n-edge'), api: $('#n-api'), db: $('#n-db'), queue: $('#n-queue'), sso: $('#n-int') };
+
+      const resetNodes = ()=> Object.values(nodes).forEach(n=>n&&n.classList.remove('warn','down','bad','shake'));
+
+      const scenarios = {
+        'sso-latency': [
+          { t:0,  fn:()=>nodes.sso?.classList.add('warn') },
+          { t:5,  fn:()=>updateMetrics(200,5) },
+          { t:10, fn:()=>nodes.sso?.classList.add('shake') },
+          { t:15, fn:()=>updateMetrics(300,12) },
+          { t:25, fn:()=>nodes.sso?.classList.remove('shake','warn') },
+          { t:25, fn:()=>updateMetrics(120,1) }
+        ],
+        'db-outage': [
+          { t:0,  fn:()=>nodes.db?.classList.add('down','shake') },
+          { t:2,  fn:()=>updateMetrics(400,20) },
+          { t:6,  fn:()=>nodes.queue?.classList.add('warn') },
+          { t:12, fn:()=>updateMetrics(500,40) },
+          { t:18, fn:()=>nodes.db?.classList.remove('shake') },
+          { t:24, fn:()=>{ nodes.db?.classList.remove('down'); nodes.queue?.classList.remove('warn'); updateMetrics(100,2);} }
+        ],
+        'packet-loss': [
+          { t:0,  fn:()=>nodes.edge?.classList.add('warn') },
+          { t:3,  fn:()=>updateMetrics(250,8) },
+          { t:9,  fn:()=>nodes.edge?.classList.add('shake') },
+          { t:15, fn:()=>updateMetrics(320,15) },
+          { t:20, fn:()=>{ nodes.edge?.classList.remove('shake','warn'); updateMetrics(110,1);} }
+        ]
+      };
+
+      function randomScenarioKey(){
+        const keys = Object.keys(scenarios);
+        return keys[Math.floor(Math.random()*keys.length)];
+      }
+
+      let timers = [];
+
+      launchBtn.addEventListener('click', ()=>{
+        clearTimers();
+        resetNodes();
+        metricsChart.data.datasets.forEach(d=>{
+          d.data = Array(60).fill(d.label.includes('latency')?40:0);
+        });
+        metricsChart.update();
+
+        let key = incidentSelect.value || '';
+        if(key==='random') key = randomScenarioKey();
+        if(!scenarios[key]) return;
+
+        const now = Date.now();
+        scenarios[key].forEach(step=>{
+          const handle = setTimeout(step.fn, step.t*1000);
+          timers.push(handle);
+        });
+      });
+
+      resetBtn.addEventListener('click', ()=>{ clearTimers(); resetNodes(); metricsChart.data.datasets.forEach(d=>{d.data=Array(60).fill(d.label.includes('latency')?40:0);}); metricsChart.update(); });
+
+      function clearTimers(){ timers.forEach(t=>clearTimeout(t)); timers=[]; }
+
+      function updateMetrics(latency,error){
+        // shift chart
+        metricsChart.data.datasets[0].data.push(latency);
+        metricsChart.data.datasets[0].data.shift();
+        metricsChart.data.datasets[1].data.push(error);
+        metricsChart.data.datasets[1].data.shift();
+        metricsChart.update('none');
+      }
+
+      // expose globally so other modules can nudge the chart safely
+      try { window.updateMetrics = updateMetrics; } catch(e) {}
+
+    })();
+
+
+    /* ===== architecture node details ===== */
+    (function(){
+      const details = {
+        'n-clients': { title:'Clients', body:`Students (iOS/Android) and Admin Console (web). Auth via campus SSO; sessions cached locally for offline tolerance.` },
+        'n-edge': { title:'Edge: WAF + CDN', body:`AWS CloudFront + WAF or Azure Front Door + WAF. DDoS protection, TLS, signed URLs for private content.` },
+        'n-lb': { title:'Ingress: Load Balancer / API Gateway', body:`Route traffic, apply rate limits and transforms. AWS ALB + (optional) API Gateway; Azure App Gateway + (optional) API Management.` },
+        'n-api': { title:'Stateless API Pods', body:`Horizontally scalable stateless services. AWS Fargate (ECS) or Azure AKS. OpenTelemetry instrumentation.` },
+        'n-cache': { title:'Cache (Redis)', body:`ElastiCache (AWS) or Azure Cache for Redis. Read‑through caching, stale‑while‑revalidate, short TTLs for LMS/SIS.` },
+        'n-db': { title:'Relational DB', body:`Aurora PostgreSQL (multi‑AZ + replicas) or Azure DB for PostgreSQL Flexible. pgbouncer pooling, PITR, query budgets.` },
+        'n-obj': { title:'Object Storage', body:`S3 or Blob Storage. Private buckets/containers, versioned. Access via short‑TTL presigned URLs.` },
+        'n-queue': { title:'Queue / Bus', body:`SQS + SNS or Service Bus. Smooth spikes, DLQs for poison messages, backoff + jitter.` },
+        'n-workers': { title:'Workers & Jobs', body:`Fargate tasks / AKS workers / Azure Functions. ETL, fan‑out notifications, scheduled jobs.` },
+        'n-int': { title:'Integrations: SSO, Canvas, Banner', body:`Isolated service broker for campus systems. Circuit breakers, timeouts, soft/negative caching.` },
+        'n-obs': { title:'Observability', body:`Logs, metrics, traces → CloudWatch/Azure Monitor; Sentry for crashes; optional SIEM (Security Hub/Sentinel).` },
+      };
+      const title = $('#archTitle'), body = $('#archBody');
+      $$('#diagram .node').forEach(n=>{
+        n.addEventListener('click', ()=>{
+          const d = details[n.id]; if(!d) return;
+          title.textContent = d.title; body.innerHTML = `<p>${d.body}</p><div class="badges"><span class="chip">aws</span><span class="chip">azure</span></div>`;
+        });
+      });
+    })();
+
+    /* ===== BOM filters & vendor view ===== */
+    (function(){
+      const vendorSel = $('#vendorSelect'); const hideAws = $('#hideAws'); const hideAz = $('#hideAzure');
+      function apply(){
+        const v = vendorSel.value;
+        const showAWS = (v==='both' || v==='aws') && !hideAws.checked;
+        const showAZ  = (v==='both' || v==='azure') && !hideAz.checked;
+        $$('[data-col="aws"]').forEach(el=> el.style.display = showAWS ? '' : 'none');
+        $$('[data-col="azure"]').forEach(el=> el.style.display = showAZ ? '' : 'none');
+      }
+      [vendorSel, hideAws, hideAz].forEach(el=> el.addEventListener('change', apply)); apply();
+      const filter = $('#bomFilter'); const clear = $('#bomClear'); const rows = $$('#bomTable tbody tr');
+      const run = ()=>{ const q=filter.value.trim().toLowerCase(); rows.forEach(r=> r.style.display = r.innerText.toLowerCase().includes(q) ? '' : 'none'); };
+      filter.addEventListener('input', run); clear.addEventListener('click', ()=>{ filter.value=''; run(); });
+    })();
+
+    /* ===== risk filter ===== */
+    (function(){
+      const f = $('#riskFilter'), c = $('#riskClear'), rows = $$('#riskTable tbody tr');
+      const run = ()=>{ const q=f.value.trim().toLowerCase(); rows.forEach(r=> r.style.display = r.innerText.toLowerCase().includes(q)? '' : 'none'); };
+      f.addEventListener('input', run); c.addEventListener('click', ()=>{ f.value=''; run(); });
+    })();
+
+    /* ===== cost calculator + animated pie ===== */
+    (function(){
+      const dau = $('#dau'), dauVal = $('#dauVal'), range = $('#costRange'), pie = $('#costPie');
+      const ctx = pie.getContext('2d');
+      function lerp(a,b,t){ return a + (b-a)*t; }
+      function fmt(n){ return n.toLocaleString(); }
+      function bands(vendor, users){
+        const pts = vendor==='aws'
+          ? [{u:300, lo:2000, hi:3000}, {u:2000, lo:6000, hi:7000}, {u:20000, lo:12000, hi:15000}]
+          : [{u:300, lo:2500, hi:3500}, {u:2000, lo:7000, hi:8000}, {u:20000, lo:14000, hi:17000}];
+        const U = clamp(users, 100, 25000);
+        let a=pts[0], b=pts[1]; if(U<=pts[1].u){ a=pts[0]; b=pts[1]; } else { a=pts[1]; b=pts[2]; }
+        const t = (U - a.u) / (b.u - a.u); const lo = Math.round(lerp(a.lo, b.lo, t)); const hi = Math.round(lerp(a.hi, b.hi, t));
+        return {lo, hi};
+      }
+      function drawPieAnimated(values, labels, colors, duration=800){
+        const total = values.reduce((s,v)=>s+v,0); const start = performance.now();
+        function frame(now){
+          ctx.clearRect(0,0,pie.width,pie.height);
+          ctx.font = '700 16px ui-sans-serif'; ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--ink-inv'); ctx.fillText('cost breakdown (est.)', 12, 24);
+          const cx=130, cy=135, r=90; let angle=-Math.PI/2; const t = Math.min(1, (now-start)/duration);
+          for(let i=0;i<values.length;i++){
+            const slice = (values[i]/total)*Math.PI*2 * t;
+            ctx.beginPath(); ctx.moveTo(cx,cy); ctx.arc(cx,cy,r,angle,angle+slice); ctx.closePath();
+            ctx.fillStyle = colors[i%colors.length]; ctx.fill(); angle += slice;
+          }
+          ctx.font = '13px ui-sans-serif'; let lx=260, ly=70;
+          for(let i=0;i<labels.length;i++){ ctx.fillStyle = colors[i%colors.length]; ctx.fillRect(lx, ly-10, 12, 12);
+            ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--ink-inv'); ctx.fillText(labels[i], lx+18, ly); ly += 24; }
+          if(t<1) requestAnimationFrame(frame);
+        }
+        requestAnimationFrame(frame);
+      }
+      function update(){
+        const users = +dau.value; dauVal.textContent = fmt(users);
+        const vendor = document.querySelector('input[name="vendorCost"]:checked').value;
+        const {lo,hi} = bands(vendor, users); range.textContent = `$${lo.toLocaleString()}–${hi.toLocaleString()}/mo`;
+        const mid = (lo+hi)/2; const parts=[.38,.27,.08,.12,.05,.10].map(p=>Math.round(mid*p));
+        const labels=[`compute ~ 38% ($${parts[0].toLocaleString()}/mo)`,`db ~ 27% ($${parts[1].toLocaleString()}/mo)`,`cache ~ 8% ($${parts[2].toLocaleString()}/mo)`,`storage+cdn ~ 12% ($${parts[3].toLocaleString()}/mo)`,`queues+waf ~ 5% ($${parts[4].toLocaleString()}/mo)`,`observability ~ 10% ($${parts[5].toLocaleString()}/mo)`];
+        const colors = ['#FFC72C','#D33F49','#B07CFF','#FDBA74','#22C55E','#60A5FA'];
+        drawPieAnimated(parts, labels, colors);
+      }
+      dau.addEventListener('input', update); $$('input[name="vendorCost"]').forEach(r=> r.addEventListener('change', update)); update();
+    })();
+
+    /* ===== vendor quick quiz (modal) ===== */
+    (function(){
+      const btn = $('#quizBtn');
+      btn.addEventListener('click', ()=>{
+        const overlay = document.createElement('div'); overlay.className='overlay'; overlay.setAttribute('role','dialog'); overlay.setAttribute('aria-modal','true');
+        overlay.innerHTML = `
+          <div class="modal">
+            <div class="row" style="justify-content:space-between">
+              <h3 style="margin:0">Vendor helper (30s)</h3>
+              <button class="btn small" id="mClose">✖</button>
+            </div>
+            <p class="muted">answer a few and we’ll make a quick recommendation — you can still run both.</p>
+            <form id="quizForm" class="grid" style="grid-template-columns: 1fr 1fr;">
+              <div class="card"><strong>Existing alignment</strong>
+                <p><label><input type="radio" name="align" value="ms" checked/> Heavier Microsoft/Entra today</label></p>
+                <p><label><input type="radio" name="align" value="aws"/> Heavier AWS today</label></p>
+              </div>
+              <div class="card"><strong>Ops preference</strong>
+                <p><label><input type="radio" name="ops" value="fargate" checked/> Prefer managed containers (no k8s control plane)</label></p>
+                <p><label><input type="radio" name="ops" value="aks"/> Comfortable managing AKS/Kubernetes</label></p>
+              </div>
+              <div class="card"><strong>Security stack</strong>
+                <p><label><input type="radio" name="sec" value="sentinel" checked/> Want Sentinel/SIEM with Entra signals</label></p>
+                <p><label><input type="radio" name="sec" value="guard"/> Prefer Security Hub/GuardDuty</label></p>
+              </div>
+              <div class="card"><strong>Team skills</strong>
+                <p><label><input type="radio" name="skill" value="aws" checked/> Team stronger in AWS</label></p>
+                <p><label><input type="radio" name="skill" value="azure"/> Team stronger in Azure</label></p>
+              </div>
+            </form>
+            <div class="row" style="justify-content:flex-end; margin-top:10px"><button class="btn small primary" id="mGo">recommend</button></div>
+            <div id="mResult" style="margin-top:12px"></div>
+          </div>`;
+        document.body.appendChild(overlay);
+        $('#mClose').onclick = ()=> overlay.remove();
+        $('#mGo').onclick = ()=>{
+          const f = $('#quizForm'); const D = new FormData(f);
+          let scoreAWS=0, scoreAZ=0;
+          if(D.get('align')==='ms') scoreAZ++; else scoreAWS++;
+          if(D.get('ops')==='fargate') scoreAWS++; else scoreAZ++;
+          if(D.get('sec')==='sentinel') scoreAZ++; else scoreAWS++;
+          if(D.get('skill')==='aws') scoreAWS++; else scoreAZ++;
+          const pick = scoreAWS>=scoreAZ ? 'aws' : 'azure';
+          $('#vendorSelect').value = pick; $('#vendorSelect').dispatchEvent(new Event('change'));
+          $('#mResult').innerHTML = `<div class="callout"><strong>Recommendation:</strong> ${pick.toUpperCase()} (AWS: ${scoreAWS}, Azure: ${scoreAZ}).</div>`;
+        };
+      });
+    })();
+
+    /* ===== export ===== */
+    $('#exportBtn').addEventListener('click', ()=> window.print());
+
+    /* ===== print shortcut ===== */
+    document.addEventListener('keydown', e=>{ if((e.metaKey||e.ctrlKey) && e.key.toLowerCase()==='p'){ e.preventDefault(); window.print(); }});
+
+    /* ===== animated background orbs ===== */
+    (function(){
+      const c = $('#bgCanvas'); const ctx = c.getContext('2d'); let w,h,dpr=window.devicePixelRatio||1, orbs=[];
+      function resize(){ w=window.innerWidth; h=window.innerHeight; c.width=w*dpr; c.height=h*dpr; ctx.setTransform(dpr,0,0,dpr,0,0); }
+      window.addEventListener('resize', resize); resize();
+      const colors = ['#FFC72C','#D33F49','#F05A28','#7C3AED','#22D3EE'];
+      for(let i=0;i<12;i++){ orbs.push({x:Math.random()*w,y:Math.random()*h,r:18+Math.random()*48,vx:(Math.random()-.5)*.2,vy:(Math.random()-.5)*.2, c:colors[i%colors.length]}); }
+      (function tick(){ ctx.clearRect(0,0,w,h); ctx.globalCompositeOperation='lighter';
+        for(const o of orbs){ o.x+=o.vx; o.y+=o.vy; if(o.x<-50||o.x>w+50) o.vx*=-1; if(o.y<-50||o.y>h+50) o.vy*=-1;
+          const g = ctx.createRadialGradient(o.x,o.y,0,o.x,o.y,o.r); g.addColorStop(0, o.c+'88'); g.addColorStop(1, o.c+'00');
+          ctx.fillStyle=g; ctx.beginPath(); ctx.arc(o.x,o.y,o.r,0,Math.PI*2); ctx.fill(); }
+        ctx.globalCompositeOperation='source-over'; requestAnimationFrame(tick);
+      })();
+    })();
+
+    /* ====================== TOUR 3.0 — bigger CTA, resume, focus-trap, better steps ====================== */
+    (function(){
+      const tourBtn = $('#tourBtn');
+      const fab = $('#fabTour');
+      const LS_KEY = 'pcc_tour_progress';
+      let i = 0, mask, ring, pop, currentClickHandler=null, forceAdvance=false;
+
+      const steps = [
+        { sel:'#cover', title:'welcome 👋', msg:'this 13‑step guided tour will show you the plan without overwhelm. we’ll cover: ELI5, search/TOC, architecture, outages, AWS/Azure mapping, SLOs, scale, privacy, cost, rollout, risks — then a glossary. ready?', placement:'right', actionLabel:'let’s go', action:()=>{}, waitFor:()=> true },
+        { sel:'#cover', title:'ELI5 toggle', msg:'ELI5 adds plain‑english callouts for non‑experts. flip it on/off to see the difference.', placement:'right', actionLabel:'toggle ELI5', action:()=>{ const c=$('#eli5Toggle'); c.checked=!c.checked; c.dispatchEvent(new Event('change')); }, waitFor:()=> true },
+        { sel:'.search', title:'search & shortcuts', msg:'use search to highlight text (⌘/ctrl+k). try typing “redis” or “RPO”.', placement:'bottom', actionLabel:'focus search', action:()=>$('#search').focus(), waitFor:()=> true },
+        { sel:'#arch', title:'architecture map', msg:'click any component to see its role + AWS/Azure mapping. try “Stateless API Pods.”', placement:'bottom', actionLabel:'auto demo', action:()=>$('#n-api').dispatchEvent(new Event('click')), waitFor:()=> true, clickToContinue:'#diagram .node' },
+        { sel:'#cover .card:nth-child(2)', title:'outage simulation', msg:'flip “simulate sso outage” to see graceful degradation (red box shakes).', placement:'left', actionLabel:'simulate now', action:()=>{ const c=$('#simulateSSO'); c.checked=true; c.dispatchEvent(new Event('change')); }, waitFor:()=> $('#simulateSSO').checked===true },
+        { sel:'#bom', title:'aws ⇄ azure bill of materials', msg:'pick a vendor and filter rows (e.g., “redis”). you can also hide aws or azure columns.', placement:'top', actionLabel:'filter “redis”', action:()=>{ const f=$('#bomFilter'); f.value='redis'; f.dispatchEvent(new Event('input')); }, waitFor:()=> true },
+        { sel:'#slos', title:'SLOs & release gates', msg:'these targets protect student experience. risky launches pause when error budgets burn.', placement:'top', waitFor:()=> true },
+        { sel:'#scale', title:'scalability mechanics', msg:'db pooling, partitioning, and cache TTLs keep latency tight under load.', placement:'top', waitFor:()=> true },
+        { sel:'#privacy', title:'privacy & retention', msg:'ferpa/cpra posture, minimal data, immutable audit logs. DSR in 10 business days.', placement:'top', waitFor:()=> true },
+        { sel:'#cost', title:'cost bands & sliders', msg:'drag DAU, switch AWS/Azure, and watch the range + pie update.', placement:'top', actionLabel:'set to 5,000', action:()=>{ const s=$('#dau'); s.value=5000; s.dispatchEvent(new Event('input')); }, waitFor:()=> true },
+        { sel:'#plan', title:'rollout with hard gates', msg:'pilot → department → campus. we won’t go wide until SLOs are solid for 30 days.', placement:'right', waitFor:()=> true },
+        { sel:'#risks', title:'risk register', msg:'mitigations are pre‑wired (cache, breakers, DLQ, budget alerts, VPAT checks).', placement:'top', waitFor:()=> true },
+        { sel:'#glossary', title:'you’re set ✅', msg:'you’ve seen the essentials. use the TOC on the left anytime. want a printable copy? hit “export”.', placement:'right', waitFor:()=> true, finish:true }
+      ];
+
+      function ensureEls(){
+        mask = document.createElement('div'); mask.className='tour-mask';
+        ring = document.createElement('div'); ring.className='tour-ring';
+        pop  = document.createElement('div'); pop.className='tour-pop'; pop.setAttribute('role','dialog'); pop.setAttribute('aria-modal','true');
+        document.body.append(mask, ring, pop);
+        document.body.style.overflow = 'hidden';
+        requestAnimationFrame(()=> mask.classList.add('show'));
+        mask.addEventListener('click', onNext);
+        fab?.classList.add('hidden');
+      }
+
+      function position(target, placement){
+        const r = target.getBoundingClientRect(); const pad = 8;
+        const x = r.left - pad, y = r.top - pad, w = r.width + pad*2, h = r.height + pad*2;
+        Object.assign(ring.style, { left: x+'px', top: y+'px', width: w+'px', height: h+'px', borderRadius: '16px' });
+
+        // popover placement
+        const vw = window.innerWidth, vh = window.innerHeight; const gap = 12; let px=x+w+gap, py=y;
+        if(placement==='left'){ px = x - 520 - gap; py=y; }
+        if(placement==='bottom'){ px = x; py = y + h + gap; }
+        if(placement==='top'){ px = x; py = y - 240 - gap; }
+        px = Math.min(Math.max(12, px), vw - 540); py = Math.min(Math.max(12, py), vh - 260);
+        Object.assign(pop.style, { left: px+'px', top: py+'px' });
+
+        // arrow
+        pop.querySelector('.arrow')?.remove();
+        const arrow = document.createElement('div'); arrow.className='arrow';
+        if(placement==='right'){ Object.assign(arrow.style, { left:'-7px', top:'18px' }); }
+        else if(placement==='left'){ Object.assign(arrow.style, { right:'-7px', top:'18px', transform:'rotate(225deg)' }); }
+        else if(placement==='bottom'){ Object.assign(arrow.style, { left:'18px', top:'-7px', transform:'rotate(315deg)' }); }
+        else { Object.assign(arrow.style, { left:'18px', bottom:'-7px', transform:'rotate(135deg)' }); }
+        pop.appendChild(arrow);
+      }
+
+      function trapFocus(){
+        const focusables = pop.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
+        const first = focusables[0], last = focusables[focusables.length-1];
+        pop.addEventListener('keydown', (e)=>{
+          if(e.key !== 'Tab') return;
+          if(e.shiftKey){ if(document.activeElement===first){ e.preventDefault(); last.focus(); } }
+          else{ if(document.activeElement===last){ e.preventDefault(); first.focus(); } }
+        });
+      }
+
+      function render(){
+        const s = steps[i]; const target = document.querySelector(s.sel); if(!target){ onNext(); return; }
+        target.scrollIntoView({behavior:'smooth', block:'center'});
+
+        // dots (clickable)
+        const total = steps.length; const pct = Math.round((i/(total-1))*100);
+        const dots = Array.from({length:total},(_,k)=>`<button aria-label="Go to step ${k+1}" data-idx="${k}" class="${k===i?'active':''}"></button>`).join('');
+        pop.innerHTML = `
+          <div class="row">
+            <strong>${s.title}</strong>
+            <div class="dots" aria-hidden="false" aria-label="Tour progress">${dots}</div>
+          </div>
+          <div class="progressline" aria-hidden="true"><i style="width:${pct}%"></i></div>
+          <p style="margin:8px 0 10px">${s.msg}</p>
+          <div class="row">
+            <div>
+              ${s.actionLabel ? `<button class="btn small" id="tourAction">${s.actionLabel}</button>`:''}
+            </div>
+            <div class="muted" style="margin-right:auto">step ${i+1} of ${total}</div>
+            <div>
+              <button class="btn small" id="tourRestart">restart</button>
+              <button class="btn small" id="tourPrev"${i===0?' disabled':''}>◀ prev</button>
+              <button class="btn small primary" id="tourNext">${s.finish?'finish':'next ▶'}</button>
+            </div>
+          </div>
+        `;
+
+        // focus & position
+        position(target, s.placement || 'right');
+        trapFocus();
+        pop.querySelector('#tourNext')?.focus({preventScroll:true});
+
+        // wire buttons
+        pop.querySelector('#tourPrev')?.addEventListener('click', onPrev);
+        pop.querySelector('#tourNext')?.addEventListener('click', onNext);
+        pop.querySelector('#tourRestart')?.addEventListener('click', ()=>{ i=0; saveProgress(); render(); });
+        const act = pop.querySelector('#tourAction'); if(act) act.addEventListener('click', ()=> s.action && s.action());
+
+        // dots jump
+        pop.querySelectorAll('.dots button').forEach(btn=> btn.addEventListener('click', (e)=>{ const idx=+e.currentTarget.dataset.idx; i=idx; saveProgress(); render(); }));
+
+        // task: click to continue handler (cleanup previous)
+        if(currentClickHandler){ document.removeEventListener('click', currentClickHandler, true); currentClickHandler=null; }
+        if(s.clickToContinue){
+          currentClickHandler = (e)=>{ if(e.target.closest(s.clickToContinue)){ document.removeEventListener('click', currentClickHandler, true); currentClickHandler=null; onNext(); } };
+          document.addEventListener('click', currentClickHandler, true);
+        }
+
+        // keyboard nav (override per-step)
+        function keyNav(e){ if(e.key==='ArrowRight'){ onNext(); } else if(e.key==='ArrowLeft'){ onPrev(); } else if(e.key==='Escape'){ endTour(); } }
+        document.addEventListener('keydown', keyNav, { once:true });
+
+        // keep positioning on resize/scroll
+        const recalc = ()=> position(target, s.placement || 'right');
+        window.addEventListener('resize', recalc, { once:true });
+        window.addEventListener('scroll', recalc, { once:true, passive:true });
+      }
+
+      function saveProgress(){ try{ localStorage.setItem(LS_KEY, String(i)); }catch{} }
+
+      function onNext(){
+
+        const s = steps[i];
+        // If step has a waitFor and it's not satisfied, first press will warn; second press within 4s will force-advance.
+        let ok = true;
+        if (typeof s?.waitFor === 'function') {
+          try { ok = !!s.waitFor(); } catch(e){ ok = true; }
+          if (!ok && !forceAdvance) {
+            toast('complete this step first (press Next again to skip)');
+            forceAdvance = true;
+            setTimeout(()=>{ forceAdvance = false; }, 4000);
+            return;
+          }
+        }
+        if (s.finish) { endTour(); return; }
+        i = Math.min(i+1, steps.length-1);
+        forceAdvance = false;
+        saveProgress(); render();
+    }
+
+function onPrev(){ i = Math.max(i-1, 0); saveProgress(); render(); }
+      function endTour(){
+        mask?.remove(); ring?.remove(); pop?.remove();
+        document.body.style.overflow=''; fab?.classList.remove('hidden');
+        confetti();
+      }
+      function confetti(){
+        const c = document.createElement('div'); c.style.cssText='position:fixed;inset:0;pointer-events:none;z-index:2600;overflow:hidden';
+        for(let j=0;j<90;j++){
+          const s = document.createElement('div'); s.textContent = ['🎉','✨','🎊','⭐'][j%4];
+          const left = Math.random()*100; const dur = 1500 + Math.random()*1200; const delay = Math.random()*300;
+          s.style.cssText = `position:absolute; left:${left}vw; top:-10vh; font-size:${16+Math.random()*18}px; animation: fall ${dur}ms ${delay}ms both ease-out`;
+          c.appendChild(s);
+        }
+        const style = document.createElement('style'); style.textContent='@keyframes fall{to{transform: translateY(120vh) rotate(360deg); opacity:.9}}';
+        document.head.appendChild(style); document.body.appendChild(c); setTimeout(()=>{ c.remove(); style.remove(); }, 2200);
+      }
+
+      function startTour(from=0){
+        i = clamp(from, 0, steps.length-1);
+        ensureEls(); render();
+      }
+
+      // Tour button — resume dialog if progress saved
+      function handleStartClick(){
+        let saved = parseInt(localStorage.getItem(LS_KEY) || '-1', 10);
+        if(Number.isFinite(saved)) { saved = Math.max(0, Math.min(saved, steps.length-1)); }
+        if(!Number.isFinite(saved) || saved<1){
+          startTour(0);
+        }else{
+          // simple resume choice
+          const overlay = document.createElement('div'); overlay.className='overlay'; overlay.innerHTML = `
+            <div class="modal">
+              <h3 style="margin:0">Guided tour</h3>
+              <p class="muted">you previously reached step <strong>${saved+1}</strong> of ${steps.length}. pick an option:</p>
+              <div class="row" style="justify-content:flex-end">
+                <button class="btn small" id="tCancel">cancel</button>
+                <button class="btn small" id="tRestart">restart</button>
+                <button class="btn small primary" id="tResume">resume</button>
+              </div>
+            </div>`;
+          document.body.appendChild(overlay);
+          $('#tCancel').onclick = ()=> overlay.remove();
+          $('#tRestart').onclick = ()=>{ overlay.remove(); startTour(0); };
+          $('#tResume').onclick  = ()=>{ overlay.remove(); startTour(saved); };
+        }
+      }
+      tourBtn.addEventListener('click', handleStartClick);
+      fab.addEventListener('click', handleStartClick);
+
+      // First-visit nudge (show FAB; no modal)
+      (function(){
+        const flag = 'pcc_tour_first_seen';
+        if(!localStorage.getItem(flag)){
+          // show for first time (already visible); set after short delay
+          setTimeout(()=> localStorage.setItem(flag, '1'), 2000);
+        }
+      })();
+
+      // keep ring & pop synced while user scrolls
+      document.addEventListener('scroll', () => {
+        if (!ring || !pop) return;
+        const s = steps[i] || null;
+        if (!s || !s.sel) return;
+        const t = document.querySelector(s.sel);
+        if (t) position(t, s.placement || 'right');
+      }, { passive: true });
+window.addEventListener('resize', () => {
+        if (!ring || !pop) return;
+        const s = steps[i] || null;
+        if (!s || !s.sel) return;
+        const t = document.querySelector(s.sel);
+        if (t) position(t, s.placement || 'right');
+      }, { passive: true });
+    })();
+
+  </script>
+
+  <script>
+    /* ===== Enlarge Architecture Diagram (zoom overlay with pan/zoom) ===== */
+    (function(){
+      const legend = document.querySelector('#arch .legend');
+      if(!legend) return;
+      const btn = document.createElement('button');
+      btn.className = 'btn small';
+      btn.id = 'zoomDiagramBtn';
+      btn.title = 'Enlarge architecture diagram';
+      btn.textContent = '🔍 enlarge';
+      legend.appendChild(btn);
+
+      btn.addEventListener('click', ()=>{
+        const overlay = document.createElement('div');
+        overlay.className = 'overlay';
+        overlay.setAttribute('role','dialog');
+        overlay.setAttribute('aria-modal','true');
+        overlay.innerHTML = `
+          <div class="zoom-modal">
+            <div class="zoom-toolbar">
+              <strong>Architecture diagram — full view</strong>
+              <div class="row">
+                <span class="zoom-help">scroll = zoom, drag = pan</span>
+                <button class="btn small" id="zoomFit">fit</button>
+                <button class="btn small" id="zoomMinus">–</button>
+                <button class="btn small" id="zoomPlus">+</button>
+                <button class="btn small" id="zoomClose">✖</button>
+              </div>
+            </div>
+            <div class="zoom-viewport" id="zoomViewport">
+              <div class="zoom-stage" id="zoomStage"></div>
+            </div>
+          </div>`;
+        document.body.appendChild(overlay);
+
+        const src = document.getElementById('diagram');
+        // Clone the SVG so we don't disturb the inline one
+        const clone = src.cloneNode(true);
+        clone.id = 'diagramZoom';
+        // Ensure preserveAspectRatio for quality scaling
+        clone.setAttribute('preserveAspectRatio','xMidYMid meet');
+        document.getElementById('zoomStage').appendChild(clone);
+
+        // Pan + Zoom handlers
+        const viewport = document.getElementById('zoomViewport');
+        const stage = document.getElementById('zoomStage');
+        let scale = 1, tx = 0, ty = 0, dragging = false, sx = 0, sy = 0;
+
+        function apply(){ stage.style.transform = `translate(${tx}px, ${ty}px) scale(${scale})`; }
+        function fitToView(){
+          // Fit width to viewport with a little margin
+          const vpW = viewport.clientWidth, vpH = viewport.clientHeight;
+          // The clone width is set to 1400px, but compute from bbox for safety
+          const bbox = clone.viewBox?.baseVal || { width: 940, height: 480 };
+          const s1 = (vpW - 24) / bbox.width;
+          const s2 = (vpH - 24) / bbox.height;
+          scale = Math.max(0.5, Math.min( s1, s2 ));
+          tx = 12; ty = 12; apply();
+        }
+
+        viewport.addEventListener('wheel', (e)=>{
+          e.preventDefault();
+          const delta = e.deltaY < 0 ? 0.1 : -0.1;
+          scale = Math.min(3, Math.max(0.5, +(scale + delta).toFixed(2)));
+          apply();
+        }, { passive:false });
+
+        viewport.addEventListener('mousedown', (e)=>{
+          dragging = true; sx = e.clientX; sy = e.clientY;
+          viewport.style.cursor = 'grabbing';
+        });
+        document.addEventListener('mousemove', (e)=>{
+          if(!dragging) return;
+          tx += (e.clientX - sx); ty += (e.clientY - sy);
+          sx = e.clientX; sy = e.clientY; apply();
+        });
+        document.addEventListener('mouseup', ()=>{ dragging = false; viewport.style.cursor = 'default'; });
+
+        document.getElementById('zoomPlus').onclick  = ()=>{ scale = Math.min(3, scale + 0.15); apply(); };
+        document.getElementById('zoomMinus').onclick = ()=>{ scale = Math.max(0.5, scale - 0.15); apply(); };
+        document.getElementById('zoomFit').onclick   = ()=>{ fitToView(); };
+
+        document.getElementById('zoomClose').onclick = ()=> overlay.remove();
+        overlay.addEventListener('click', (e)=>{ if(e.target === overlay) overlay.remove(); });
+
+        // Initial fit
+        requestAnimationFrame(fitToView);
+      });
+    })();
+  </script>
+
+</body>
+</html>
